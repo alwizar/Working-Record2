@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aplikasi Catatan Pekerjaan & Pengeluaran Terstruktur</title>
+  
+  <!-- CDN SheetJS (Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- CDN jsPDF & jsPDF-AutoTable (PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 980px;
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 85vh;
+    }
+
+    /* Navigasi Tab Header */
+    .nav-tabs {
+      display: flex;
+      background: #1e293b;
+      border-bottom: 2px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .nav-tab {
+      flex: 1;
+      min-width: 140px;
+      padding: 14px 10px;
+      text-align: center;
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .nav-tab.active {
+      background: var(--card-bg);
+      color: var(--primary);
+      border-bottom: 3px solid var(--primary);
+    }
+
+    .nav-tab.active-expense {
+      background: var(--card-bg);
+      color: var(--danger);
+      border-bottom: 3px solid var(--danger);
+    }
+
+    /* Tab Content */
+    .tab-content {
+      display: none;
+      padding: 20px;
+      flex: 1;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin-bottom: 20px;
+      color: var(--text);
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 15px;
+      background-color: #fff;
+    }
+
+    input[type="file"] {
+      padding: 8px;
+      background: #f1f5f9;
+      cursor: pointer;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+
+    .img-preview-container {
+      margin-top: 8px;
+      display: none;
+    }
+
+    .img-preview {
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      object-fit: cover;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-expense {
+      background: var(--danger);
+    }
+
+    .btn-expense:hover {
+      background: #dc2626;
+    }
+
+    .btn-cancel {
+      background: #64748b;
+      margin-top: 8px;
+    }
+
+    /* Grid Folder Utama */
+    .folder-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .folder-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .folder-card:hover {
+      background: #eff6ff;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .folder-card.expense-card:hover {
+      background: #fef2f2;
+      border-color: var(--danger);
+    }
+
+    .folder-icon {
+      font-size: 38px;
+      margin-bottom: 8px;
+    }
+
+    .folder-title {
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .folder-count {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .total-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 8px;
+      background: #fee2e2;
+      color: #991b1b;
+      font-weight: 700;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .btn-delete-folder {
+      margin-top: 12px;
+      background: #fee2e2;
+      color: var(--danger);
+      border: 1px solid #fca5a5;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-delete-folder:hover {
+      background: var(--danger);
+      color: #ffffff;
+    }
+
+    /* Control Panel & Filter */
+    .controls-panel {
+      background: #f1f5f9;
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .btn-back {
+      background: #253342;
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .folder-header-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #ffffff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .filter-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #475569;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 80px;
+    }
+
+    .filter-select {
+      border: none;
+      padding: 4px 6px;
+      font-size: 14px;
+      background: transparent;
+      outline: none;
+      width: 100%;
+    }
+
+    /* Tombol Export */
+    .export-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .btn-export {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #fff;
+      transition: opacity 0.2s ease;
+    }
+
+    .btn-export:hover {
+      opacity: 0.9;
+    }
+
+    .btn-export-excel {
+      background-color: #10b981;
+    }
+
+    .btn-export-pdf {
+      background-color: #ef4444;
+    }
+
+    /* CARD VIEW UNTUK FOLDER PEKERJA */
+    .card-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .data-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .data-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .data-card-num {
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .data-card-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .data-card-label {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .data-card-value {
+      font-weight: 600;
+      color: var(--text);
+      text-align: right;
+    }
+
+    .data-card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .data-card-actions button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* TABEL UNTUK FOLDER PENGELUARAN */
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .doc-thumb {
+      width: 45px;
+      height: 45px;
+      object-fit: cover;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+    }
+
+    .amount-text {
+      font-weight: 700;
+      color: var(--danger);
+    }
+
+    .action-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-edit {
+      background: #fef3c7;
+      color: #d97706;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .btn-delete {
+      background: #fee2e2;
+      color: var(--danger);
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .empty-msg {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 40px 20px;
+      font-size: 15px;
+    }
+
+    .total-box {
+      margin-top: 16px;
+      padding: 14px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    /* Modals */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.75);
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .modal-content {
+      max-width: 90%;
+      max-height: 80vh;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 25px;
+      color: #fff;
+      font-size: 32px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .confirm-modal-box {
+      background: #ffffff;
+      border-radius: 12px;
+      max-width: 420px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+
+    .confirm-modal-icon { font-size: 48px; margin-bottom: 12px; }
+    .confirm-modal-title { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .confirm-modal-desc { font-size: 14px; color: #475569; margin-bottom: 16px; }
+
+    .warning-box {
+      background-color: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .confirm-modal-actions { display: flex; gap: 10px; }
+    .btn-modal-cancel {
+      flex: 1; padding: 10px; border: 1px solid var(--border);
+      background: #f1f5f9; color: #334155; border-radius: 6px; font-weight: 600; cursor: pointer;
+    }
+    .btn-modal-confirm {
+      flex: 1; padding: 10px; border: none;
+      background: var(--danger); color: #ffffff; border-radius: 6px; font-weight: 600; cursor: pointer;
+    }
+
+    /* Responsif Mobile */
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .app-container { border-radius: 0; min-height: 100vh; }
+      .tab-content { padding: 12px; }
+      th, td { padding: 8px 10px; font-size: 12px; }
+      .doc-thumb { width: 36px; height: 36px; }
+      .export-buttons { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Navigasi Tab Header -->
+  <div class="nav-tabs">
+    <div class="nav-tab" id="tabNavJobInput" onclick="switchTab('job-input-page')">
+      📝 Pekerjaan Baru
+    </div>
+    <div class="nav-tab" id="tabNavJobList" onclick="switchTab('job-list-page')">
+      📁 Folder Pekerja
+    </div>
+    <div class="nav-tab" id="tabNavExpInput" onclick="switchTab('expense-input-page')">
+      💸 Input Pengeluaran
+    </div>
+    <div class="nav-tab" id="tabNavExpList" onclick="switchTab('expense-list-page')">
+      📊 Folder Pengeluaran
+    </div>
+  </div>
+
+  <!-- TAB 1: Input / Edit Pekerjaan -->
+  <div id="job-input-page" class="tab-content">
+    <h2 id="jobFormTitle">Catat Pekerjaan Baru</h2>
+    <form id="jobForm">
+      <input type="hidden" id="editJobId">
+
+      <div class="form-group">
+        <label for="namaPekerja">Nama Personel / Pengerja</label>
+        <input type="text" id="namaPekerja" required placeholder="Contoh: Budi Santoso">
+      </div>
+
+      <div class="form-group">
+        <label for="jenisPekerjaan">Jenis Pekerjaan</label>
+        <input type="text" id="jenisPekerjaan" class="jenisPekerjaanInput" required placeholder="Ketik jenis pekerjaan...">
+      </div>
+
+      <div class="form-group">
+        <label for="tanggalPekerjaan">Tanggal Pekerjaan</label>
+        <input type="date" id="tanggalPekerjaan" required>
+      </div>
+
+      <div class="form-group">
+        <label for="dokumentasiPekerjaan">Dokumentasi (Foto)</label>
+        <input type="file" id="dokumentasiPekerjaan" accept="image/*" onchange="previewFileImage(event, 'previewJobImg', 'jobPreviewContainer', 'jobBase64')">
+        <input type="hidden" id="jobBase64">
+        <div class="img-preview-container" id="jobPreviewContainer">
+          <img id="previewJobImg" class="img-preview" alt="Preview Foto">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="keteranganPekerjaan">Keterangan Pekerjaan</label>
+        <textarea id="keteranganPekerjaan" placeholder="Tuliskan rincian atau detail pekerjaan..."></textarea>
+      </div>
+
+      <button type="submit" id="btnSubmitJob" class="btn-submit">Simpan Pekerjaan</button>
+      <button type="button" id="btnCancelJob" class="btn-submit btn-cancel" style="display: none;" onclick="resetJobForm()">Batal Edit</button>
+    </form>
+  </div>
+
+  <!-- TAB 2: Folder Pekerjaan (CARD VIEW) -->
+  <div id="job-list-page" class="tab-content">
+    <div id="folderJobView">
+      <h2>Folder Nama Pekerja</h2>
+      <div id="folderJobGrid" class="folder-grid"></div>
+      <div id="emptyFolderJobMsg" class="empty-msg" style="display: none;">
+        Belum ada folder/data pekerjaan. Silakan input pekerjaan baru.
+      </div>
+    </div>
+
+    <div id="detailJobView" style="display: none;">
+      <div class="controls-panel">
+        <button class="btn-back" onclick="closeJobDetail()">⬅️ Kembali ke Folder</button>
+        <div class="folder-header-title" id="selectedJobFolderName">Folder: -</div>
+        
+        <div class="filter-row">
+          <span class="filter-label">🛠️ Filter:</span>
+          <select id="jobJenisFilter" class="filter-select" onchange="renderJobCards()">
+            <option value="ALL">Semua Jenis Pekerjaan</option>
+          </select>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">📅 Tanggal:</span>
+          <select id="jobSortOrder" class="filter-select" onchange="renderJobCards()">
+            <option value="DESC">Terbaru → Terlama</option>
+            <option value="ASC">Terlama → Terbaru</option>
+          </select>
+        </div>
+
+        <!-- Tombol Export Pekerjaan -->
+        <div class="export-buttons">
+          <button class="btn-export btn-export-excel" onclick="exportJobToExcel()">📊 Export Excel</button>
+          <button class="btn-export btn-export-pdf" onclick="exportJobToPDF()">📄 Export PDF</button>
+        </div>
+      </div>
+
+      <!-- Container Card View -->
+      <div id="jobCardListContainer" class="card-list-container"></div>
+
+      <div id="emptyJobDetailMsg" class="empty-msg" style="display: none;">
+        Tidak ada data pekerjaan yang sesuai dengan filter.
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Input / Edit Pengeluaran -->
+  <div id="expense-input-page" class="tab-content">
+    <h2 id="expFormTitle">Catat Pengeluaran Baru</h2>
+    <form id="expenseForm">
+      <input type="hidden" id="editExpenseId">
+
+      <div class="form-group">
+        <label for="expJenisPekerjaan">Jenis Pekerjaan</label>
+        <input type="text" id="expJenisPekerjaan" list="jenisDatalist" required placeholder="Contoh: Pemasangan Keramik / Proyek A">
+        <datalist id="jenisDatalist"></datalist>
+      </div>
+
+      <div class="form-group">
+        <label for="namaPengeluaran">Nama Pengeluaran</label>
+        <input type="text" id="namaPengeluaran" required placeholder="Contoh: Beli Semen 5 Sak / Uang Makan">
+      </div>
+
+      <div class="form-group">
+        <label for="tanggalPengeluaran">Tanggal Pengeluaran</label>
+        <input type="date" id="tanggalPengeluaran" required>
+      </div>
+
+      <div class="form-group">
+        <label for="jumlahPengeluaran">Jumlah / Total (Rp)</label>
+        <input type="number" id="jumlahPengeluaran" min="0" required placeholder="Contoh: 350000">
+      </div>
+
+      <div class="form-group">
+        <label for="buktiPengeluaran">Bukti Pengeluaran (Foto Nota/Struk)</label>
+        <input type="file" id="buktiPengeluaran" accept="image/*" onchange="previewFileImage(event, 'previewExpImg', 'expPreviewContainer', 'expBase64')">
+        <input type="hidden" id="expBase64">
+        <div class="img-preview-container" id="expPreviewContainer">
+          <img id="previewExpImg" class="img-preview" alt="Preview Bukti Foto">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="keteranganPengeluaran">Keterangan</label>
+        <textarea id="keteranganPengeluaran" placeholder="Tuliskan catatan tambahan mengenai pengeluaran..."></textarea>
+      </div>
+
+      <button type="submit" id="btnSubmitExp" class="btn-submit btn-expense">Simpan Pengeluaran</button>
+      <button type="button" id="btnCancelExp" class="btn-submit btn-cancel" style="display: none;" onclick="resetExpenseForm()">Batal Edit</button>
+    </form>
+  </div>
+
+  <!-- TAB 4: Folder Pengeluaran (GRID TABLE VIEW) -->
+  <div id="expense-list-page" class="tab-content">
+    <div id="folderExpView">
+      <h2>Folder Pengeluaran (Per Jenis Pekerjaan)</h2>
+      <div id="folderExpGrid" class="folder-grid"></div>
+      <div id="emptyFolderExpMsg" class="empty-msg" style="display: none;">
+        Belum ada folder/catatan pengeluaran.
+      </div>
+    </div>
+
+    <div id="detailExpView" style="display: none;">
+      <div class="controls-panel">
+        <button class="btn-back" onclick="closeExpenseDetail()">⬅️ Kembali ke Folder</button>
+        <div class="folder-header-title" id="selectedExpFolderName">Folder: -</div>
+        
+        <div class="filter-row">
+          <span class="filter-label">💳 Filter:</span>
+          <select id="expNamaFilter" class="filter-select" onchange="renderExpenseDetailTable()">
+            <option value="ALL">Semua Nama Pengeluaran</option>
+          </select>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">📅 Tanggal:</span>
+          <select id="expSortOrder" class="filter-select" onchange="renderExpenseDetailTable()">
+            <option value="DESC">Terbaru → Terlama</option>
+            <option value="ASC">Terlama → Terbaru</option>
+          </select>
+        </div>
+
+        <!-- Tombol Export Pengeluaran -->
+        <div class="export-buttons">
+          <button class="btn-export btn-export-excel" onclick="exportExpenseToExcel()">📊 Export Excel</button>
+          <button class="btn-export btn-export-pdf" onclick="exportExpenseToPDF()">📄 Export PDF</button>
+        </div>
+      </div>
+
+      <!-- Container Grid Table View -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Bukti Foto</th>
+              <th>Nama Pengeluaran</th>
+              <th>Tanggal</th>
+              <th>Jumlah (Rp)</th>
+              <th>Keterangan</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="expenseTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="total-box">
+        <span>TOTAL PENGELUARAN:</span>
+        <span id="totalExpAmount" class="amount-text">Rp 0</span>
+      </div>
+
+      <div id="emptyExpDetailMsg" class="empty-msg" style="display: none;">
+        Tidak ada data pengeluaran yang sesuai dengan filter.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal Photo Popup -->
+<div id="photoModal" class="modal" onclick="closeModal()">
+  <span class="modal-close" onclick="closeModal()">&times;</span>
+  <img id="modalImg" class="modal-content" src="" alt="Foto Full Size">
+</div>
+
+<!-- Modal Konfirmasi Hapus Folder -->
+<div id="deleteFolderModal" class="modal">
+  <div class="confirm-modal-box">
+    <div class="confirm-modal-icon">⚠️</div>
+    <div class="confirm-modal-title" id="deleteFolderModalTitle">Hapus Folder</div>
+    <div class="confirm-modal-desc" id="deleteFolderModalDesc">Apakah Anda yakin ingin menghapus folder ini beserta seluruh isinya?</div>
+    <div class="warning-box">
+      DATA YANG DIHAPUS TIDAK BISA DIKEMBALIKAN LAGI
+    </div>
+    <div class="confirm-modal-actions">
+      <button class="btn-modal-cancel" onclick="closeDeleteFolderModal()">Batal</button>
+      <button class="btn-modal-confirm" id="btnConfirmDeleteFolder">Ya, Hapus Folder</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let jobs = JSON.parse(localStorage.getItem('jobs')) || [];
+  let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+
+  let activeJobFolderNama = localStorage.getItem('activeJobFolderNama') || "";
+  let activeExpFolderJenis = localStorage.getItem('activeExpFolderJenis') || "";
+
+  let folderToDelete = { type: null, identifier: null };
+
+  function switchTab(tabId) {
+    localStorage.setItem('activeTab', tabId);
+
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(el => {
+      el.classList.remove('active');
+      el.classList.remove('active-expense');
+    });
+
+    document.getElementById(tabId).classList.add('active');
+
+    if (tabId === 'job-input-page') {
+      document.getElementById('tabNavJobInput').classList.add('active');
+    } else if (tabId === 'job-list-page') {
+      document.getElementById('tabNavJobList').classList.add('active');
+      if (activeJobFolderNama) {
+        openJobFolderDetail(activeJobFolderNama);
+      } else {
+        showJobFolderList();
+      }
+    } else if (tabId === 'expense-input-page') {
+      document.getElementById('tabNavExpInput').classList.add('active-expense');
+      populateJenisDatalist();
+    } else if (tabId === 'expense-list-page') {
+      document.getElementById('tabNavExpList').classList.add('active-expense');
+      if (activeExpFolderJenis) {
+        openExpenseFolderDetail(activeExpFolderJenis);
+      } else {
+        showExpenseFolderList();
+      }
+    }
+  }
+
+  function previewFileImage(event, imgTagId, containerId, hiddenInputId) {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          } else if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const base64Data = canvas.toDataURL('image/jpeg', 0.7);
+          document.getElementById(hiddenInputId).value = base64Data;
+          document.getElementById(imgTagId).src = base64Data;
+          document.getElementById(containerId).style.display = 'block';
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function formatRupiah(number) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
+  }
+
+  /* --- Pekerjaan --- */
+  document.getElementById('jobForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const editId = document.getElementById('editJobId').value;
+    const nama = document.getElementById('namaPekerja').value.trim();
+    const jenis = document.getElementById('jenisPekerjaan').value.trim();
+    const tanggal = document.getElementById('tanggalPekerjaan').value;
+    const keterangan = document.getElementById('keteranganPekerjaan').value.trim();
+    const dokumentasi = document.getElementById('jobBase64').value;
+
+    if (editId) {
+      const index = jobs.findIndex(j => j.id == editId);
+      if (index !== -1) {
+        jobs[index].nama = nama;
+        jobs[index].jenis = jenis;
+        jobs[index].tanggal = tanggal;
+        jobs[index].keterangan = keterangan;
+        if (dokumentasi) jobs[index].dokumentasi = dokumentasi;
+      }
+    } else {
+      jobs.push({
+        id: Date.now(),
+        nama: nama,
+        jenis: jenis,
+        tanggal: tanggal,
+        dokumentasi: dokumentasi,
+        keterangan: keterangan
+      });
+    }
+
+    localStorage.setItem('jobs', JSON.stringify(jobs));
+    resetJobForm();
+    switchTab('job-list-page');
+  });
+
+  function resetJobForm() {
+    document.getElementById('jobForm').reset();
+    document.getElementById('editJobId').value = "";
+    document.getElementById('jobBase64').value = "";
+    document.getElementById('jobPreviewContainer').style.display = 'none';
+    document.getElementById('tanggalPekerjaan').valueAsDate = new Date();
+
+    document.getElementById('jobFormTitle').textContent = "Catat Pekerjaan Baru";
+    document.getElementById('btnSubmitJob').textContent = "Simpan Pekerjaan";
+    document.getElementById('btnCancelJob').style.display = "none";
+  }
+
+  function showJobFolderList() {
+    activeJobFolderNama = "";
+    localStorage.removeItem('activeJobFolderNama');
+
+    document.getElementById('folderJobView').style.display = 'block';
+    document.getElementById('detailJobView').style.display = 'none';
+
+    const folderGrid = document.getElementById('folderJobGrid');
+    const emptyMsg = document.getElementById('emptyFolderJobMsg');
+    folderGrid.innerHTML = '';
+
+    const nameCounts = {};
+    jobs.forEach(job => {
+      const key = job.nama.trim();
+      nameCounts[key] = (nameCounts[key] || 0) + 1;
+    });
+
+    const uniqueNames = Object.keys(nameCounts);
+    if (uniqueNames.length === 0) {
+      emptyMsg.style.display = 'block';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    uniqueNames.forEach(nama => {
+      const card = document.createElement('div');
+      card.className = 'folder-card';
+      
+      card.innerHTML = `
+        <div onclick="openJobFolderDetail('${nama}')" style="width:100%;">
+          <div class="folder-icon">📁</div>
+          <div class="folder-title">${nama}</div>
+          <div class="folder-count">${nameCounts[nama]} Catatan</div>
+        </div>
+        <button class="btn-delete-folder" onclick="event.stopPropagation(); promptDeleteFolder('job', '${nama}')">
+          🗑️ Hapus Folder
+        </button>
+      `;
+      folderGrid.appendChild(card);
+    });
+  }
+
+  function openJobFolderDetail(nama) {
+    activeJobFolderNama = nama;
+    localStorage.setItem('activeJobFolderNama', nama);
+
+    document.getElementById('folderJobView').style.display = 'none';
+    document.getElementById('detailJobView').style.display = 'block';
+    document.getElementById('selectedJobFolderName').textContent = `Folder: ${nama}`;
+    
+    updateJobJenisFilterOptions();
+    renderJobCards();
+  }
+
+  function updateJobJenisFilterOptions() {
+    const filterSelect = document.getElementById('jobJenisFilter');
+    const selectedVal = filterSelect.value;
+
+    const workerJobs = jobs.filter(j => j.nama.trim().toLowerCase() === activeJobFolderNama.toLowerCase());
+    const uniqueJenis = [...new Set(workerJobs.map(j => j.jenis.trim()))];
+
+    filterSelect.innerHTML = '<option value="ALL">Semua Jenis Pekerjaan</option>';
+    uniqueJenis.forEach(jenis => {
+      const opt = document.createElement('option');
+      opt.value = jenis;
+      opt.textContent = jenis;
+      filterSelect.appendChild(opt);
+    });
+
+    if (uniqueJenis.includes(selectedVal)) {
+      filterSelect.value = selectedVal;
+    } else {
+      filterSelect.value = 'ALL';
+    }
+  }
+
+  function closeJobDetail() {
+    showJobFolderList();
+  }
+
+  function getFilteredWorkerJobs() {
+    const sortOrder = document.getElementById('jobSortOrder').value;
+    const selectedJenis = document.getElementById('jobJenisFilter').value;
+
+    let workerJobs = jobs.filter(j => j.nama.trim().toLowerCase() === activeJobFolderNama.toLowerCase());
+
+    if (selectedJenis !== 'ALL') {
+      workerJobs = workerJobs.filter(j => j.jenis.trim().toLowerCase() === selectedJenis.toLowerCase());
+    }
+
+    workerJobs.sort((a, b) => {
+      const dateA = new Date(a.tanggal);
+      const dateB = new Date(b.tanggal);
+      return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
+    });
+
+    return workerJobs;
+  }
+
+  /* RENDER CARD VIEW UNTUK PEKERJAAN */
+  function renderJobCards() {
+    const container = document.getElementById('jobCardListContainer');
+    const emptyMsg = document.getElementById('emptyJobDetailMsg');
+    container.innerHTML = '';
+
+    const workerJobs = getFilteredWorkerJobs();
+
+    if (workerJobs.length === 0) {
+      emptyMsg.style.display = 'block';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    workerJobs.forEach((job, index) => {
+      const card = document.createElement('div');
+      card.className = 'data-card';
+
+      const docHtml = job.dokumentasi 
+        ? `<img src="${job.dokumentasi}" class="doc-thumb" onclick="openModal('${job.dokumentasi}')">`
+        : `<span style="color:#94a3b8; font-style:italic;">Tanpa Bukti</span>`;
+
+      card.innerHTML = `
+        <div class="data-card-header">
+          <span class="data-card-num">No ${index + 1}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Bukti Foto</span>
+          <span class="data-card-value">${docHtml}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Nama Pekerjaan</span>
+          <span class="data-card-value">${job.jenis}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Tanggal</span>
+          <span class="data-card-value">${job.tanggal}</span>
+        </div>
+        <div class="data-card-row">
+          <span class="data-card-label">Keterangan</span>
+          <span class="data-card-value">${job.keterangan || '-'}</span>
+        </div>
+        <div class="data-card-actions">
+          <button class="btn-edit" onclick="editJob(${job.id})">✏️ Edit</button>
+          <button class="btn-delete" onclick="deleteJob(${job.id})">🗑️ Hapus</button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function editJob(id) {
+    const job = jobs.find(j => j.id == id);
+    if (!job) return;
+
+    document.getElementById('editJobId').value = job.id;
+    document.getElementById('namaPekerja').value = job.nama;
+    document.getElementById('jenisPekerjaan').value = job.jenis;
+    document.getElementById('tanggalPekerjaan').value = job.tanggal;
+    document.getElementById('keteranganPekerjaan').value = job.keterangan;
+
+    if (job.dokumentasi) {
+      document.getElementById('jobBase64').value = job.dokumentasi;
+      document.getElementById('previewJobImg').src = job.dokumentasi;
+      document.getElementById('jobPreviewContainer').style.display = 'block';
+    } else {
+      document.getElementById('jobBase64').value = "";
+      document.getElementById('jobPreviewContainer').style.display = 'none';
+    }
+
+    document.getElementById('jobFormTitle').textContent = "Edit Catatan Pekerjaan";
+    document.getElementById('btnSubmitJob').textContent = "Perbarui Pekerjaan";
+    document.getElementById('btnCancelJob').style.display = "block";
+
+    switchTab('job-input-page');
+  }
+
+  function deleteJob(id) {
+    if (confirm('Hapus catatan pekerjaan ini?')) {
+      jobs = jobs.filter(job => job.id !== id);
+      localStorage.setItem('jobs', JSON.stringify(jobs));
+      updateJobJenisFilterOptions();
+      renderJobCards();
+    }
+  }
+
+  /* EXPORT PEKERJAAN */
+  function exportJobToExcel() {
+    const list = getFilteredWorkerJobs();
+    if (list.length === 0) {
+      alert("Tidak ada data untuk diexport!");
+      return;
+    }
+
+    const exportData = list.map((item, index) => ({
+      "No": index + 1,
+      "Nama Personel": item.nama,
+      "Jenis Pekerjaan": item.jenis,
+      "Tanggal": item.tanggal,
+      "Keterangan": item.keterangan || "-"
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Catatan Pekerjaan");
+    XLSX.writeFile(workbook, `Pekerjaan_${activeJobFolderNama}.xlsx`);
+  }
+
+  function exportJobToPDF() {
+    const list = getFilteredWorkerJobs();
+    if (list.length === 0) {
+      alert("Tidak ada data untuk diexport!");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.text(`Laporan Pekerjaan: ${activeJobFolderNama}`, 14, 15);
+
+    const tableColumn = ["No", "Nama Personel", "Jenis Pekerjaan", "Tanggal", "Keterangan"];
+    const tableRows = list.map((item, index) => [
+      index + 1,
+      item.nama,
+      item.jenis,
+      item.tanggal,
+      item.keterangan || "-"
+    ]);
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 22,
+    });
+
+    doc.save(`Pekerjaan_${activeJobFolderNama}.pdf`);
+  }
+
+
+  /* --- Pengeluaran --- */
+  function populateJenisDatalist() {
+    const datalist = document.getElementById('jenisDatalist');
+    datalist.innerHTML = '';
+    
+    const jenisFromJobs = jobs.map(j => j.jenis.trim());
+    const jenisFromExp = expenses.map(e => e.jenis.trim());
+    const allJenis = [...new Set([...jenisFromJobs, ...jenisFromExp])];
+
+    allJenis.forEach(jenis => {
+      const opt = document.createElement('option');
+      opt.value = jenis;
+      datalist.appendChild(opt);
+    });
+  }
+
+  document.getElementById('expenseForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const editId = document.getElementById('editExpenseId').value;
+    const jenis = document.getElementById('expJenisPekerjaan').value.trim();
+    const nama = document.getElementById('namaPengeluaran').value.trim();
+    const tanggal = document.getElementById('tanggalPengeluaran').value;
+    const jumlah = parseFloat(document.getElementById('jumlahPengeluaran').value) || 0;
+    const keterangan = document.getElementById('keteranganPengeluaran').value.trim();
+    const bukti = document.getElementById('expBase64').value;
+
+    if (editId) {
+      const index = expenses.findIndex(e => e.id == editId);
+      if (index !== -1) {
+        expenses[index].jenis = jenis;
+        expenses[index].nama = nama;
+        expenses[index].tanggal = tanggal;
+        expenses[index].jumlah = jumlah;
+        expenses[index].keterangan = keterangan;
+        if (bukti) expenses[index].bukti = bukti;
+      }
+    } else {
+      expenses.push({
+        id: Date.now(),
+        jenis: jenis,
+        nama: nama,
+        tanggal: tanggal,
+        jumlah: jumlah,
+        bukti: bukti,
+        keterangan: keterangan
+      });
+    }
+
+    localStorage.setItem('expenses', JSON.stringify(expenses));
+    resetExpenseForm();
+    switchTab('expense-list-page');
+  });
+
+  function resetExpenseForm() {
+    document.getElementById('expenseForm').reset();
+    document.getElementById('editExpenseId').value = "";
+    document.getElementById('expBase64').value = "";
+    document.getElementById('expPreviewContainer').style.display = 'none';
+    document.getElementById('tanggalPengeluaran').valueAsDate = new Date();
+
+    document.getElementById('expFormTitle').textContent = "Catat Pengeluaran Baru";
+    document.getElementById('btnSubmitExp').textContent = "Simpan Pengeluaran";
+    document.getElementById('btnCancelExp').style.display = "none";
+  }
+
+  function showExpenseFolderList() {
+    activeExpFolderJenis = "";
+    localStorage.removeItem('activeExpFolderJenis');
+
+    document.getElementById('folderExpView').style.display = 'block';
+    document.getElementById('detailExpView').style.display = 'none';
+
+    const folderGrid = document.getElementById('folderExpGrid');
+    const emptyMsg = document.getElementById('emptyFolderExpMsg');
+    folderGrid.innerHTML = '';
+
+    const group = {};
+    expenses.forEach(exp => {
+      const key = exp.jenis.trim();
+      if (!group[key]) group[key] = { count: 0, total: 0 };
+      group[key].count += 1;
+      group[key].total += exp.jumlah;
+    });
+
+    const uniqueJenis = Object.keys(group);
+    if (uniqueJenis.length === 0) {
+      emptyMsg.style.display = 'block';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    uniqueJenis.forEach(jenis => {
+      const card = document.createElement('div');
+      card.className = 'folder-card expense-card';
+      
+      card.innerHTML = `
+        <div onclick="openExpenseFolderDetail('${jenis}')" style="width:100%;">
+          <div class="folder-icon">📂</div>
+          <div class="folder-title">${jenis}</div>
+          <div class="folder-count">${group[jenis].count} Transaksi</div>
+          <div class="total-badge">${formatRupiah(group[jenis].total)}</div>
+        </div>
+        <button class="btn-delete-folder" onclick="event.stopPropagation(); promptDeleteFolder('expense', '${jenis}')">
+          🗑️ Hapus Folder
+        </button>
+      `;
+      folderGrid.appendChild(card);
+    });
+  }
+
+  function openExpenseFolderDetail(jenis) {
+    activeExpFolderJenis = jenis;
+    localStorage.setItem('activeExpFolderJenis', jenis);
+
+    document.getElementById('folderExpView').style.display = 'none';
+    document.getElementById('detailExpView').style.display = 'block';
+    document.getElementById('selectedExpFolderName').textContent = `Folder: ${jenis}`;
+
+    updateExpenseNamaFilterOptions();
+    renderExpenseDetailTable();
+  }
+
+  function updateExpenseNamaFilterOptions() {
+    const filterSelect = document.getElementById('expNamaFilter');
+    const selectedVal = filterSelect.value;
+
+    const folderExpenses = expenses.filter(e => e.jenis.trim().toLowerCase() === activeExpFolderJenis.toLowerCase());
+    const uniqueNama = [...new Set(folderExpenses.map(e => e.nama.trim()))];
+
+    filterSelect.innerHTML = '<option value="ALL">Semua Nama Pengeluaran</option>';
+    uniqueNama.forEach(nama => {
+      const opt = document.createElement('option');
+      opt.value = nama;
+      opt.textContent = nama;
+      filterSelect.appendChild(opt);
+    });
+
+    if (uniqueNama.includes(selectedVal)) {
+      filterSelect.value = selectedVal;
+    } else {
+      filterSelect.value = 'ALL';
+    }
+  }
+
+  function closeExpenseDetail() {
+    showExpenseFolderList();
+  }
+
+  function getFilteredExpenses() {
+    const sortOrder = document.getElementById('expSortOrder').value;
+    const selectedNama = document.getElementById('expNamaFilter').value;
+
+    let filteredExp = expenses.filter(e => e.jenis.trim().toLowerCase() === activeExpFolderJenis.toLowerCase());
+
+    if (selectedNama !== 'ALL') {
+      filteredExp = filteredExp.filter(e => e.nama.trim().toLowerCase() === selectedNama.toLowerCase());
+    }
+
+    filteredExp.sort((a, b) => {
+      const dateA = new Date(a.tanggal);
+      const dateB = new Date(b.tanggal);
+      return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
+    });
+
+    return filteredExp;
+  }
+
+  /* RENDER GRID TABLE UNTUK PENGELUARAN */
+  function renderExpenseDetailTable() {
+    const tbody = document.getElementById('expenseTableBody');
+    const emptyMsg = document.getElementById('emptyExpDetailMsg');
+    tbody.innerHTML = '';
+
+    const filteredExp = getFilteredExpenses();
+    let totalSum = 0;
+
+    if (filteredExp.length === 0) {
+      emptyMsg.style.display = 'block';
+      document.getElementById('totalExpAmount').textContent = formatRupiah(0);
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    filteredExp.forEach((exp, index) => {
+      totalSum += exp.jumlah;
+      const tr = document.createElement('tr');
+      const buktiHtml = exp.bukti 
+        ? `<img src="${exp.bukti}" class="doc-thumb" onclick="openModal('${exp.bukti}')">`
+        : `<span style="color:#94a3b8; font-style:italic;">Tanpa Bukti</span>`;
+
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td>${buktiHtml}</td>
+        <td>${exp.nama}</td>
+        <td>${exp.tanggal}</td>
+        <td class="amount-text">${formatRupiah(exp.jumlah)}</td>
+        <td>${exp.keterangan || '-'}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-edit" onclick="editExpense(${exp.id})">✏️ Edit</button>
+            <button class="btn-delete" onclick="deleteExpense(${exp.id})">🗑️ Hapus</button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('totalExpAmount').textContent = formatRupiah(totalSum);
+  }
+
+  function editExpense(id) {
+    const exp = expenses.find(e => e.id == id);
+    if (!exp) return;
+
+    document.getElementById('editExpenseId').value = exp.id;
+    document.getElementById('expJenisPekerjaan').value = exp.jenis;
+    document.getElementById('namaPengeluaran').value = exp.nama;
+    document.getElementById('tanggalPengeluaran').value = exp.tanggal;
+    document.getElementById('jumlahPengeluaran').value = exp.jumlah;
+    document.getElementById('keteranganPengeluaran').value = exp.keterangan;
+
+    if (exp.bukti) {
+      document.getElementById('expBase64').value = exp.bukti;
+      document.getElementById('previewExpImg').src = exp.bukti;
+      document.getElementById('expPreviewContainer').style.display = 'block';
+    } else {
+      document.getElementById('expBase64').value = "";
+      document.getElementById('expPreviewContainer').style.display = 'none';
+    }
+
+    document.getElementById('expFormTitle').textContent = "Edit Catatan Pengeluaran";
+    document.getElementById('btnSubmitExp').textContent = "Perbarui Pengeluaran";
+    document.getElementById('btnCancelExp').style.display = "block";
+
+    switchTab('expense-input-page');
+  }
+
+  function deleteExpense(id) {
+    if (confirm('Hapus pengeluaran ini?')) {
+      expenses = expenses.filter(e => e.id !== id);
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      updateExpenseNamaFilterOptions();
+      renderExpenseDetailTable();
+    }
+  }
+
+  /* EXPORT PENGELUARAN */
+  function exportExpenseToExcel() {
+    const list = getFilteredExpenses();
+    if (list.length === 0) {
+      alert("Tidak ada data untuk diexport!");
+      return;
+    }
+
+    let total = 0;
+    const exportData = list.map((item, index) => {
+      total += item.jumlah;
+      return {
+        "No": index + 1,
+        "Jenis Pekerjaan": item.jenis,
+        "Nama Pengeluaran": item.nama,
+        "Tanggal": item.tanggal,
+        "Jumlah (Rp)": item.jumlah,
+        "Keterangan": item.keterangan || "-"
+      };
+    });
+
+    // Tambah baris total
+    exportData.push({
+      "No": "",
+      "Jenis Pekerjaan": "",
+      "Nama Pengeluaran": "TOTAL",
+      "Tanggal": "",
+      "Jumlah (Rp)": total,
+      "Keterangan": ""
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pengeluaran");
+    XLSX.writeFile(workbook, `Pengeluaran_${activeExpFolderJenis}.xlsx`);
+  }
+
+  function exportExpenseToPDF() {
+    const list = getFilteredExpenses();
+    if (list.length === 0) {
+      alert("Tidak ada data untuk diexport!");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.text(`Laporan Pengeluaran: ${activeExpFolderJenis}`, 14, 15);
+
+    let total = 0;
+    const tableColumn = ["No", "Nama Pengeluaran", "Tanggal", "Jumlah (Rp)", "Keterangan"];
+    const tableRows = list.map((item, index) => {
+      total += item.jumlah;
+      return [
+        index + 1,
+        item.nama,
+        item.tanggal,
+        formatRupiah(item.jumlah),
+        item.keterangan || "-"
+      ];
+    });
+
+    // Tambahkan baris total
+    tableRows.push(["", "TOTAL", "", formatRupiah(total), ""]);
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 22,
+    });
+
+    doc.save(`Pengeluaran_${activeExpFolderJenis}.pdf`);
+  }
+
+
+  /* --- Hapus Folder --- */
+  function promptDeleteFolder(type, identifier) {
+    folderToDelete.type = type;
+    folderToDelete.identifier = identifier;
+
+    const titleEl = document.getElementById('deleteFolderModalTitle');
+    const descEl = document.getElementById('deleteFolderModalDesc');
+
+    if (type === 'job') {
+      titleEl.textContent = `Hapus Folder Pekerja "${identifier}"?`;
+      descEl.textContent = `Seluruh catatan pekerjaan atas nama ${identifier} akan dihapus secara permanen.`;
+    } else if (type === 'expense') {
+      titleEl.textContent = `Hapus Folder Pengeluaran "${identifier}"?`;
+      descEl.textContent = `Seluruh catatan pengeluaran untuk jenis pekerjaan "${identifier}" akan dihapus secara permanen.`;
+    }
+
+    document.getElementById('deleteFolderModal').style.display = 'flex';
+  }
+
+  function closeDeleteFolderModal() {
+    document.getElementById('deleteFolderModal').style.display = 'none';
+    folderToDelete = { type: null, identifier: null };
+  }
+
+  document.getElementById('btnConfirmDeleteFolder').addEventListener('click', function() {
+    if (!folderToDelete.type || !folderToDelete.identifier) return;
+
+    if (folderToDelete.type === 'job') {
+      jobs = jobs.filter(j => j.nama.trim().toLowerCase() !== folderToDelete.identifier.trim().toLowerCase());
+      localStorage.setItem('jobs', JSON.stringify(jobs));
+      showJobFolderList();
+    } else if (folderToDelete.type === 'expense') {
+      expenses = expenses.filter(e => e.jenis.trim().toLowerCase() !== folderToDelete.identifier.trim().toLowerCase());
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      showExpenseFolderList();
+    }
+
+    closeDeleteFolderModal();
+  });
+
+  /* Modal Photo Popup */
+  function openModal(imgSrc) {
+    document.getElementById('modalImg').src = imgSrc;
+    document.getElementById('photoModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('photoModal').style.display = 'none';
+  }
+
+  // Inisialisasi Tanggal
+  document.getElementById('tanggalPekerjaan').valueAsDate = new Date();
+  document.getElementById('tanggalPengeluaran').valueAsDate = new Date();
+
+  // MUAT ULANG STATUS HALAMAN / TAB SAAT DI-REFRESH
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedTab = localStorage.getItem('activeTab') || 'job-input-page';
+    switchTab(savedTab);
+  });
+</script>
+
+</body>
+</html>
